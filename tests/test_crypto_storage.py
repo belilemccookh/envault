@@ -42,6 +42,12 @@ class TestCrypto:
         key2 = derive_key(PASSPHRASE)
         assert key1 == key2
 
+    def test_encrypt_produces_unique_tokens(self):
+        """Each encrypt call should produce a different ciphertext (due to random IV/nonce)."""
+        token1 = encrypt(SAMPLE_ENV, PASSPHRASE)
+        token2 = encrypt(SAMPLE_ENV, PASSPHRASE)
+        assert token1 != token2
+
 
 class TestStorage:
     def test_save_and_load(self):
@@ -58,6 +64,11 @@ class TestStorage:
         storage.save_env("beta", SAMPLE_ENV, PASSPHRASE)
         projects = storage.list_projects()
         assert set(projects) == {"alpha", "beta"}
+
+    def test_list_projects_empty(self):
+        """list_projects should return an empty list when no projects have been saved."""
+        projects = storage.list_projects()
+        assert projects == []
 
     def test_delete_env(self):
         storage.save_env("todelete", SAMPLE_ENV, PASSPHRASE)
