@@ -44,3 +44,23 @@ def delete_env(project_name: str) -> bool:
         path.unlink()
         return True
     return False
+
+
+def project_exists(project_name: str) -> bool:
+    """Return True if a stored env file exists for the given project name."""
+    return (STORE_DIR / f"{project_name}.enc").exists()
+
+
+def rename_project(old_name: str, new_name: str) -> None:
+    """Rename a stored project env file.
+
+    Raises FileNotFoundError if the source project does not exist.
+    Raises FileExistsError if a project with the new name already exists.
+    """
+    old_path = _project_path(old_name)
+    if not old_path.exists():
+        raise FileNotFoundError(f"No stored env found for project '{old_name}'.")
+    new_path = _project_path(new_name)
+    if new_path.exists():
+        raise FileExistsError(f"A stored env already exists for project '{new_name}'.")
+    old_path.rename(new_path)
