@@ -93,15 +93,16 @@ def rotation_summary(results: dict[str, Optional[Exception]]) -> str:
     failures = {p: err for p, err in results.items() if err is not None}
 
     lines: list[str] = []
+    lines.append(f"Rotation complete: {len(successes)} succeeded, {len(failures)} failed.")
+
     if successes:
-        lines.append(f"Rotated successfully ({len(successes)}):")
-        for name in sorted(successes):
-            lines.append(f"  ✓ {name}")
+        lines.append("  Succeeded:")
+        for project in successes:
+            lines.append(f"    - {project}")
+
     if failures:
-        lines.append(f"Failed ({len(failures)}):")
-        for name, err in sorted(failures.items()):
-            lines.append(f"  ✗ {name}: {err}")
-    if not results:
-        lines.append("No projects found — nothing to rotate.")
+        lines.append("  Failed:")
+        for project, err in failures.items():
+            lines.append(f"    - {project}: {err}")
 
     return "\n".join(lines)
