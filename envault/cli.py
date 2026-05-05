@@ -1,81 +1,78 @@
-"""CLI entry point for envault using Click."""
+"""Main CLI entry-point for envault."""
 
-import sys
+from __future__ import annotations
+
 import click
-from envault.storage import save_env, load_env, list_projects, delete_env
+
+from envault.storage import load_env, save_env, list_projects, delete_env
+from envault.audit import record
+from envault.cli_export import export_cmd, import_cmd, dump_cmd
+from envault.cli_share import share_export_cmd, share_import_cmd
 
 
 @click.group()
-def cli():
-    """envault — securely manage and sync .env files."""
-    pass
+def cli() -> None:
+    """envault — secure .env manager."""
 
 
 @cli.command("set")
 @click.argument("project")
-@click.option("--file", "-f", "env_file", default=".env", show_default=True,
-              help="Path to the .env file to encrypt and store.")
-@click.password_option("--passphrase", "-p", prompt="Passphrase",
-                       help="Passphrase used to encrypt the data.")
-def set_env(project, env_file, passphrase):
-    """Encrypt and store a .env file for PROJECT."""
-    try:
-        with open(env_file, "rb") as fh:
-            raw = fh.read()
-    except FileNotFoundError:
-        click.echo(f"Error: file '{env_file}' not found.", err=True)
-        sys.exit(1)
+@click.argument("env_file", type=click.Path(exists=True))
+@click.option("--passphrase", prompt=True, hide_input=True)
+def set_env(project: str, env_file: str, passphrase: str) -> None:
+    """Store env vars from ENV_FILE under PROJECT."""
+    from envault.export import dotenv_to_dict
+    from pathlib import Path
 
-    save_env(project, raw, passphrase)
-    click.echo(f"Stored env for project '{project}'.")
+    env = dotenv_to_dict(Path(env_file).read_text())
+    save_env(project, env, passphrase)
+    record(project, "set", success=True)
+    click.echo(f"Stored {len(env)} variable(s) for project '{project}'.")
 
 
 @cli.command("get")
 @click.argument("project")
-@click.option("--output", "-o", default=".env", show_default=True,
-              help="Destination file to write decrypted content.")
-@click.option("--passphrase", "-p", prompt="Passphrase", hide_input=True,
-              help="Passphrase used to decrypt the data.")
-def get_env(project, output, passphrase):
-    """Decrypt and restore the .env file for PROJECT."""
-    try:
-        data = load_env(project, passphrase)
-    except KeyError:
-        click.echo(f"Error: no stored env found for project '{project}'.", err=True)
-        sys.exit(1)
-    except Exception as exc:  # noqa: BLE001
-        click.echo(f"Error: {exc}", err=True)
-        sys.exit(1)
-
-    with open(output, "wb") as fh:
-        fh.write(data)
-    click.echo(f"Wrote decrypted env to '{output}'.")
+@click.argument("key")
+@click.option("--passphrase", prompt=True, hide_input=True)
+def get_env(project: str, key: str, passphrase: str) -> None:
+    """Print the value of KEY in PROJECT."""
+    env = load_env(project, passphrase)
+    if env is None:
+        record(project, "get", success=False)
+        raise click.ClickException(f"Project '{project}' not found or wrong passphrase.")
+    if key not in env:
+        raise click.ClickException(f"Key '{key}' not found in project '{project}'.")
+    record(project, "get", success=True)
+    click.echo(env[key])
 
 
 @cli.command("list")
-def list_envs():
-    """List all projects with stored env files."""
+def list_envs() -> None:
+    """List all stored projects."""
     projects = list_projects()
     if not projects:
-        click.echo("No projects stored yet.")
-    else:
-        click.echo("Stored projects:")
-        for name in sorted(projects):
-            click.echo(f"  - {name}")
+        click.echo("No projects stored.")
+        return
+    for p in sorted(projects):
+        click.echo(p)
 
 
 @cli.command("delete")
 @click.argument("project")
-@click.confirmation_option(prompt="Are you sure you want to delete this env?")
-def delete_env_cmd(project):
-    """Delete the stored env for PROJECT."""
-    try:
-        delete_env(project)
-        click.echo(f"Deleted env for project '{project}'.")
-    except KeyError:
-        click.echo(f"Error: no stored env found for project '{project}'.", err=True)
-        sys.exit(1)
+@click.option("--passphrase", prompt=True, hide_input=True)
+@click.confirmation_option(prompt="Are you sure you want to delete this project?")
+def delete_env_cmd(project: str, passphrase: str) -> None:
+    """Delete a stored project."""
+    env = load_env(project, passphrase)
+    if env is None:
+        raise click.ClickException(f"Project '{project}' not found or wrong passphrase.")
+    delete_env(project)
+    record(project, "delete", success=True)
+    click.echo(f"Deleted project '{project}'.")
 
 
-if __name__ == "__main__":
-    cli()
+cli.add_command(export_cmd)
+cli.add_command(import_cmd)
+cli.add_command(dump_cmd)
+cli.add_command(share_export_cmd)
+cli.add_command(share_import_cmd)
