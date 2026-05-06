@@ -66,3 +66,21 @@ def clear_cmd(project: str) -> None:
     """Remove all tags from PROJECT."""
     tag_lib.clear_tags(project)
     click.echo(f"All tags cleared for '{project}'.")
+
+
+@tags_cmd.command("rename")
+@click.argument("old_tag")
+@click.argument("new_tag")
+def rename_cmd(old_tag: str, new_tag: str) -> None:
+    """Rename OLD_TAG to NEW_TAG across all projects."""
+    projects = tag_lib.projects_with_tag(old_tag)
+    if not projects:
+        click.echo(f"Tag '{old_tag.strip().lower()}' not found on any project.", err=True)
+        raise SystemExit(1)
+    for project in projects:
+        tag_lib.remove_tag(project, old_tag)
+        tag_lib.add_tag(project, new_tag)
+    click.echo(
+        f"Renamed tag '{old_tag.strip().lower()}' to '{new_tag.strip().lower()}' "
+        f"across {len(projects)} project(s)."
+    )
