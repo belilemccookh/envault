@@ -24,7 +24,12 @@ def _load() -> Dict[str, List[str]]:
     p = _tags_path()
     if not p.exists():
         return {}
-    return json.loads(p.read_text())
+    try:
+        return json.loads(p.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Tags file '{p}' contains invalid JSON: {exc}"
+        ) from exc
 
 
 def _save(data: Dict[str, List[str]]) -> None:
