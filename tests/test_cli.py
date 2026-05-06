@@ -92,3 +92,10 @@ class TestDeleteCommand:
             result = runner.invoke(cli, ["delete", PROJECT, "--yes"])
         assert result.exit_code != 0
         assert "no stored env" in result.output
+
+    def test_delete_aborted_without_yes(self, runner):
+        """Ensure delete prompts for confirmation and aborts when declined."""
+        with patch("envault.cli.delete_env") as mock_del:
+            result = runner.invoke(cli, ["delete", PROJECT], input="n\n")
+        assert result.exit_code != 0
+        mock_del.assert_not_called()
