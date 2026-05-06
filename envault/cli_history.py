@@ -64,6 +64,39 @@ def history_restore_cmd(project: str, index: int, passphrase: str, yes: bool) ->
     click.echo(f"Restored '{project}' to snapshot {index}.")
 
 
+@history_cmd.command("diff")
+@click.argument("project")
+@click.argument("index_a", type=int)
+@click.argument("index_b", type=int)
+def history_diff_cmd(project: str, index_a: int, index_b: int) -> None:
+    """Show key differences between two snapshots INDEX_A and INDEX_B of PROJECT."""
+    try:
+        env_a = get_snapshot(project, index_a)
+        env_b = get_snapshot(project, index_b)
+    except IndexError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    keys = sorted(set(env_a) | set(env_b))
+    if not keys:
+        click.echo("Both snapshots are empty.")
+        return
+
+    differences_found = False
+    for key in keys:
+        if key not in env_a:
+            click.echo(f"+ {key}={env_b[key]}")
+            differences_found = True
+        elif key not in env_b:
+            click.echo(f"- {key}={env_a[key]}")
+            differences_found = True
+        elif env_a[key] != env_b[key]:
+            click.echo(f"~ {key}: {env_a[key]!r} -> {env_b[key]!r}")
+            differences_found = True
+
+    if not differences_found:
+        click.echo("No differences between snapshots.")
+
+
 @history_cmd.command("clear")
 @click.argument("project")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompt.")
